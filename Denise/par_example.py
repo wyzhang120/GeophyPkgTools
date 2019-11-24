@@ -1,9 +1,9 @@
 import os
 import numpy as np
-import denise_IO.denise_out as deniseIO
-from denise_IO.utils_denise import AcqCw2, print_factors, write_mfile
-from utils_marmousi_cw import crop_mamousi
-from util_model_building import mod2d
+import PkgTools.Denise.denise_out as deniseIO
+from PkgTools.Denise.utils_denise import AcqCw2, print_factors, write_mfile
+from PkgTools.TOY2DAC_marm.utils_marmousi_cw import crop_mamousi
+from utils_model_building.util_model_building import mod2d
 from sympy.ntheory import factorint
 
 
