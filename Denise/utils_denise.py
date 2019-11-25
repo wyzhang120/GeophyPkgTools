@@ -85,7 +85,8 @@ def write_mfile(mfile, dict_mfile, basedir):
 
 
 class ModLoader:
-    def __init__(self, datadir, basename, nx, nz, dx):
+    def __init__(self, datadir, basename, nx, nz, dx,
+                 keys=('vp', 'vs', 'rho')):
         self.datadir = datadir
         self.basename = basename
         self.nx = nx
@@ -93,9 +94,13 @@ class ModLoader:
         self.dx = dx
         self.height = (nz - 1) * dx
         self.width = (nx - 1) * dx
-        self.vp = self.readmod('vp')
-        self.vs = self.readmod('vs')
-        self.rho = self.readmod('rho')
+        attrs = ('vp', 'vs', 'rho')
+        for ikey, iattr in zip(keys, attrs):
+            if ikey is not None:
+                self.__setattr__(iattr, self.readmod(ikey))
+        # self.vp = self.readmod(keys[0])
+        # self.vs = self.readmod('vs')
+        # self.rho = self.readmod('rho')
 
     def readmod(self, key, byteorder='<'):
         data_type = np.dtype('float32').newbyteorder(byteorder)
