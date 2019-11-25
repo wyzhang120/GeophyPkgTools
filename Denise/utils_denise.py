@@ -4,6 +4,7 @@ from sympy.ntheory import factorint
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pickle
+import pandas as pd
 
 
 class AcqCw2:
@@ -106,6 +107,11 @@ class ModLoader:
         with open(os.path.join(datadir, fname), 'rb') as f:
             cmap = pickle.load(f)
         return cmap
+
+
+def workflow_parser(indir, in_name, outdir, out_name):
+    df = pd.read_csv(os.path.join(indir, in_name), sep='\s+', header=0)
+    df.to_csv(os.path.join(outdir, out_name))
 
 
 class PltModel:
