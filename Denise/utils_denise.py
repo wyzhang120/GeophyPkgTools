@@ -252,7 +252,7 @@ class PltModel:
         ax = ax.reshape([nr, nc])
         fig.set_size_inches(ifigsize[0] * nc, ifigsize[1] * nr + nr * hpad)
         if ctitle is None:
-            ctitle = ['k'] * len(idxlist)
+            ctitle = ['k'] * len(self.tbar)
         for i in range(nr):
             for j in range(nc):
                 idx = idxlist[i * nc + j]

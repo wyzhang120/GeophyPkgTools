@@ -19,15 +19,30 @@ from PkgTools.Denise.utils_denise import ModLoader, PltModel
 # cbar = fig.colorbar(img, cax=cax, spacing='uniform')
 # plt.show()
 
-datadir = '/project/stewart/wzhang/src/DENISE-Black-Edition/par/model'
-basename = 'modelTest_{}_stage_4.bin'
+# datadir = '/project/stewart/wzhang/src/DENISE-Black-Edition/par/model'
+datadir = 'D:\Geophysics\Project\Marmousi\FWI_Denise'
+basename_inv = 'modelTest_{}_stage_4.bin'
+basename_true = 'marmousi_II_marine.{}'
+basename_init = 'marmousi_II_start_1D.{}'
 nx = 500
 nz = 174
 dx = 20.
-mod = ModLoader(datadir, basename, nx, nz, dx)
-cmap = mod.read_cmap('/project/stewart/wzhang/src/DENISE-Black-Edition/par/visu', 'cmap_cm.pkl')
-PltImg = PltModel((mod.vp/1000, mod.vs/1000, mod.rho/1000),
-                  ('vp', 'vs', 'rho'), ('km/s', 'km/s', 'g/cc'), 0,
-                  mod.height, mod.width, ytitle='Depth')
-fig = PltImg.viewMulti([0, 1, 2], (3, 1), (6, 3), cmap=cmap)
-plt.show()
+mod_inv = ModLoader(datadir, basename_inv, nx, nz, dx)
+mod_true = ModLoader(datadir, basename_true, nx, nz, dx)
+mod_init = ModLoader(datadir, basename_init, nx, nz, dx)
+# cmap = mod_inv.read_cmap('/project/stewart/wzhang/src/DENISE-Black-Edition/par/visu', 'cmap_cm.pkl')
+cmap = 'jet'
+titles = [j + i for i in ('_inv', '_true', '_init') for j in ('vp', 'vs', 'rho')]
+PltImg = PltModel((mod_inv.vp/1000, mod_inv.vs/1000, mod_inv.rho/1000,
+                   mod_true.vp/1000, mod_true.vs/1000, mod_true.rho/1000,
+                   mod_init.vp/1000, mod_init.vs/1000, mod_init.rho/1000,),
+                  titles, ['km/s', 'km/s', 'g/cc'] * 3, 0,
+                  mod_inv.height, mod_inv.width, padDist=(0, 0, -3500, 0), ytitle='Depth')
+fig = PltImg.viewMulti(np.arange(3, dtype=np.int32), (3, 1), (6, 1.5), cmap=cmap)
+fig.savefig(os.path.join(datadir, 'Marm_Denise_FWI.pdf'))
+fig = PltImg.viewMulti(np.arange(3, 6, dtype=np.int32), (3, 1), (6, 1.5), cmap=cmap)
+fig.savefig(os.path.join(datadir, 'Marm_Denise_True.pdf'))
+fig = PltImg.viewMulti(np.arange(6, 9, dtype=np.int32), (3, 1), (6, 1.5), cmap=cmap)
+fig.savefig(os.path.join(datadir, 'Marm_Denise_Init.pdf'))
+fig = PltImg.viewMulti((3, 6, 0), (3, 1), (6, 1.5), cmap=cmap, clim=(1, 5.5))
+fig.savefig(os.path.join(datadir, 'Marm_Denise_Vp_Comp.pdf'))
