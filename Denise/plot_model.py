@@ -26,7 +26,7 @@ basename_inv = 'modelTest_{}_stage_4.bin'
 basename_true = 'marmousi_II_marine.{}'
 basename_init = 'marmousi_II_start_1D.{}'
 basename_rtm_mod = 'marmousi_II_smooth2.{}'
-basename_rtm_img = 'jacobian_Test_{}_image'
+basename_rtm_img = 'jacobian_Test_{}_image_shot_70'
 nx = 500
 nz = 174
 dx = 20.
@@ -45,7 +45,7 @@ def plot_fwi_true_init():
                        mod_true.vp/1000, mod_true.vs/1000, mod_true.rho/1000,
                        mod_init.vp/1000, mod_init.vs/1000, mod_init.rho/1000,),
                       titles, ['km/s', 'km/s', 'g/cc'] * 3, 0,
-                      mod_inv.height, mod_inv.width, padDist=(0, 0, -3500, 0), ytitle='Depth')
+                      mod_inv.height, mod_inv.width, padDist=(0, 0, -4050, 0), ytitle='Depth')
     fig = PltImg.viewMulti(np.arange(3, dtype=np.int32), (3, 1), (6, 1.5), cmap=cmap)
     fig.savefig(os.path.join(datadir, 'Marm_Denise_FWI.pdf'))
     fig = PltImg.viewMulti(np.arange(3, 6, dtype=np.int32), (3, 1), (6, 1.5), cmap=cmap)
@@ -69,5 +69,5 @@ def plot_rtm():
     fig.savefig(os.path.join(datadir, 'Marm_rtm_p.pdf'))
 
 
-# plot_fwi_true_init()
-plot_rtm()
+plot_fwi_true_init()
+# plot_rtm()
