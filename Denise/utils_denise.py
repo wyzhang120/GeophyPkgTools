@@ -202,8 +202,6 @@ class PltModel:
         plt.tight_layout(h_pad=hpad)
         return fig, ax
 
-
-
     def view(self, idx=0, figsize=(6, 6), cmap='jet',
              pltAcq=False, zsrcPar=None, zrecPar=None,
              srcSym='r*', recSym='g<', padCbar=0.05, hpad=1.5,
