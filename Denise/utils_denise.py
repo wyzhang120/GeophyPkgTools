@@ -1,10 +1,12 @@
 import os
+import cv2
 import numpy as np
 from sympy.ntheory import factorint
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pickle
 import pandas as pd
+from skimage.transform import resize
 
 
 class AcqCw2:
@@ -86,7 +88,7 @@ def write_mfile(mfile, dict_mfile, basedir):
 
 class ModLoader:
     def __init__(self, datadir, basename, nx, nz, dx,
-                 keys=('vp', 'vs', 'rho')):
+                 keys=('vp', 'vs', 'rho'), fastz=True):
         self.datadir = datadir
         self.basename = basename
         self.nx = nx
@@ -94,6 +96,7 @@ class ModLoader:
         self.dx = dx
         self.height = (nz - 1) * dx
         self.width = (nx - 1) * dx
+        self.fastz = fastz
         attrs = ('vp', 'vs', 'rho')
         for ikey, iattr in zip(keys, attrs):
             if ikey is not None:
@@ -102,11 +105,13 @@ class ModLoader:
         # self.vs = self.readmod('vs')
         # self.rho = self.readmod('rho')
 
-    def readmod(self, key, byteorder='<'):
+    def readmod(self, key, byteorder='<', trans=True):
         data_type = np.dtype('float32').newbyteorder(byteorder)
+        shape = (self.nx, self.nz) if self.fastz else (self.nz, self.nx)
         with open(os.path.join(self.datadir, self.basename.format(key)), 'rb') as f:
-            mod = np.fromfile(f, dtype=data_type).reshape(self.nx, self.nz)
-        return mod.T
+            mod = np.fromfile(f, dtype=data_type).reshape(shape)
+        mod = mod.T if trans else mod
+        return mod
 
     def read_cmap(self, datadir, fname):
         with open(os.path.join(datadir, fname), 'rb') as f:
@@ -284,3 +289,43 @@ class PltModel:
         """
         fig.savefig(fname+ftype)
         plt.close(fig)
+
+
+class LocateDeniseMod:
+    def __init__(self, par0, par, segydir, segyvp):
+        vp_denise = self.resizex(par0, par)
+        nz, nx = vp_denise.shape if par0['trans'] else vp_denise.shape[::-1]
+        width = (nx - 1) * par['dx']
+        height = (nz - 1) * par['dx']
+        self.resize_denise = vp_denise
+        self.width = width
+        self.height = height
+        self.nz = nz
+        self.nx = nx
+        self.segydir = segydir
+        self.segyvp = segyvp
+        self.par = par
+        self.par0 = par0
+
+    def resizex(self, par0, par1):
+        loader1 = ModLoader(par0['dir'], par0['basename'], par0['nx'], par0['nz'],
+                            par0['dx'], fastz=par0['fastz'])
+        vp1 = loader1.readmod('vp', trans=par0['trans'])
+        scaler = par0['dx'] / par1['dx']
+        size2 = np.int32(np.array(vp1.shape) * scaler)
+        vp2 = resize(vp1, size2, preserve_range=True, mode='constant')
+        return vp2
+
+    def locate_template(self, img, template):
+        cxr = cv2.matchTemplate(np.float32(img), np.float32(template),
+                                method=cv2.TM_CCORR_NORMED)
+        ind = np.unravel_index(np.argmax(cxr), cxr.shape)
+        return ind
+
+    def locate_mod(self, xsearch, zsearch):
+        from TOY2DAC_marm.utils_marmousi_cw import crop_mamousi
+        vp_segy = crop_mamousi(self.segydir, self.segyvp, x0=xsearch[0], x1=xsearch[1],
+                               z0=zsearch[0], z1=zsearch[1], dx=self.par['dx'])
+        ind_align = self.locate_template(vp_segy, self.resize_denise)
+        offset = np.array(ind_align) * self.par['dx'] + np.array([xsearch[0], zsearch[0]])
+        return ind_align, offset
