@@ -8,6 +8,22 @@ import h5py
 class PltToy2dac:
     def __init__(self, datadir, freqlist, nfast, nslow, dx,
                  npml, zsrc, zrec, xsrc, xrec, z0=0, x0=0, fastz=True):
+        """
+        Read and plot toy2dac forward modeling seismic data, spectrum, and wavefield
+        :param datadir: string,
+        :param freqlist: array-like,
+        :param nfast: int, n in fast dimension of model
+        :param nslow: int, n in slow dimension of model
+        :param dx: float, spacing of model
+        :param npml: int
+        :param zsrc: array-like,
+        :param zrec: array-like,
+        :param xsrc: float,
+        :param xrec: float,
+        :param z0: float, z coord at uppler left corner of model
+        :param x0: float, x coord at uppler left corner of model
+        :param fastz: bool,
+        """
         self.datadir = datadir
         self.freqlist = np.array(freqlist)
         self.npml = npml
