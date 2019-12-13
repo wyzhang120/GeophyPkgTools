@@ -41,7 +41,7 @@ class PltToy2dac:
             self.height = (nfast - 1) * self.dx
             self.width = (nslow - 1) * self.dx
         else:
-            self.width= (nfast - 1) * self.dx
+            self.width = (nfast - 1) * self.dx
             self.height = (nslow - 1) * self.dx
 
     def read_wavefield(self, fname='wavefield'):
@@ -123,6 +123,7 @@ class PltToy2dac:
             f.create_dataset('fc', data=fc)
             f.create_dataset('delay', data=delay)
             f.create_dataset('spectrum', data=dataf)
+            f.create_dataset('seismo_spec', data=datafft[ind1:ind2, :, :])
             f.create_dataset('freqlist', data=self.freqlist)
             f.create_dataset('df', data=dfreq)
             f.create_dataset('dt', data=1./dfreq/(N-1))
@@ -131,10 +132,10 @@ class PltToy2dac:
         if not os.path.exists(os.path.join(self.datadir, fh5 + '.h5')):
             self.freq2time(fname, fh5, fc, delay_n_period)
         with h5py.File(os.path.join(self.datadir, fh5 + '.h5'), 'r') as f:
-            seis = f['seismo'].value
-            dt = f['dt'].value
-            delay = f['delay'].value
-            fc = f['fc'].value
+            seis = f['seismo'][()]
+            dt = f['dt'][()]
+            delay = f['delay'][()]
+            fc = f['fc'][()]
         nt = seis.shape[0]
         ntPlot = nt
         t = dt * np.arange(ntPlot) * 1000
@@ -152,6 +153,48 @@ class PltToy2dac:
                self.zsrc[idSrc], self.xsrc, self.zrec[idRec], self.xrec))
         plt.show()
 
+    def plot_gather(self, fname, fh5, zsrc_plot, zrec_plot=(0, 106), t_plot=(0, 1000),
+                    fc=100, delay_n_period=10):
+        if not os.path.exists(os.path.join(self.datadir, fh5 + '.h5')):
+            self.freq2time(fname, fh5, fc, delay_n_period)
+        with h5py.File(os.path.join(self.datadir, fh5 + '.h5'), 'r') as f:
+            seis = f['seismo'][()]
+            dt = f['dt'][()]
+        nt = seis.shape[0]
+        t = dt * np.arange(nt) * 1000
+        idSrc = np.argmin(np.abs(zsrc_plot - self.zsrc))
+        idRec0 = np.argmin(np.abs(zrec_plot[0] - self.zrec))
+        idRec1 = np.argmin(np.abs(zrec_plot[1] - self.zrec))
+        idt0 = np.argmin(np.abs(t_plot[0] - t))
+        idt1 = np.argmin(np.abs(t_plot[1] - t))
+        data = seis[idt0:idt1 + 1, idSrc, idRec0:idRec1 + 1]
+        ext = [self.zrec[idRec0], self.zrec[idRec1], t[idt1], t[idt0]]
+        fig, ax = plt.subplots()
+        ax.imshow(data, extent=ext, cmap='Greys')
+        ax.set_ylabel('t [ms]')
+        ax.set_xlabel('zrec [m]')
+        plt.show()
+
+    def get_id(self, x, xarr):
+        idx = np.argmin(np.abs(x - xarr))
+        return idx
+
+    def get_spec(self, fh5, ricker=True):
+        key = 'seismo_spec' if ricker else 'spectrum'
+        with h5py.File(os.path.join(self.datadir, fh5 + '.h5'), 'r') as f:
+            trace = f[key][()]
+        amp = np.absolute(trace)
+        phase = np.unwrap(np.angle(trace))
+        return amp, phase
+
+    def get_spec_trace(self, fh5, zsrc_plot, zrec_plot, ricker=True):
+        amp, phase = self.get_spec(fh5, ricker)
+        idSrc = self.get_id(zsrc_plot, self.zsrc)
+        idRec = self.get_id(zrec_plot, self.zrec)
+        data_amp = amp[:, idSrc, idRec]
+        data_phase = phase[:, idSrc, idRec]
+        freq = self.freqlist
+        return data_amp, data_phase, freq
 
 
 def greenfunc2d(xzsrc, xzrec, freqlist, vp, qp=1000):
