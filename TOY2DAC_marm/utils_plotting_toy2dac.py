@@ -2,6 +2,7 @@ import os
 import numpy as np
 from scipy.special import hankel1
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
 
 
@@ -154,14 +155,15 @@ class PltToy2dac:
         plt.show()
 
     def plot_gather(self, fname, fh5, zsrc_plot, zrec_plot=(0, 106), t_plot=(0, 1000),
-                    fc=100, delay_n_period=10):
+                    fc=100, delay_n_period=10, aspect=1.0):
         if not os.path.exists(os.path.join(self.datadir, fh5 + '.h5')):
             self.freq2time(fname, fh5, fc, delay_n_period)
         with h5py.File(os.path.join(self.datadir, fh5 + '.h5'), 'r') as f:
             seis = f['seismo'][()]
             dt = f['dt'][()]
+            delay = f['delay'][()]
         nt = seis.shape[0]
-        t = dt * np.arange(nt) * 1000
+        t = (dt * np.arange(nt) - delay) * 1000
         idSrc = np.argmin(np.abs(zsrc_plot - self.zsrc))
         idRec0 = np.argmin(np.abs(zrec_plot[0] - self.zrec))
         idRec1 = np.argmin(np.abs(zrec_plot[1] - self.zrec))
@@ -170,10 +172,17 @@ class PltToy2dac:
         data = seis[idt0:idt1 + 1, idSrc, idRec0:idRec1 + 1]
         ext = [self.zrec[idRec0], self.zrec[idRec1], t[idt1], t[idt0]]
         fig, ax = plt.subplots()
-        ax.imshow(data, extent=ext, cmap='Greys')
+        img = ax.imshow(data, extent=ext, cmap='Greys', aspect=aspect)
+        # polarity: black is positive
+        # ax.imshow(data, cmap='Greys')
         ax.set_ylabel('t [ms]')
         ax.set_xlabel('zrec [m]')
+        # divider = make_axes_locatable(ax)
+        # cax = divider.append_axes('right', size='5%', pad=0.05)
+        # cbar = fig.colorbar(img, cax=cax, spacing='uniform')
+        plt.tight_layout()
         plt.show()
+        return fig, ax
 
     def get_id(self, x, xarr):
         idx = np.argmin(np.abs(x - xarr))
