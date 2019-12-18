@@ -99,6 +99,23 @@ class PltToy2dac:
         plt.show()
 
     def freq2time(self, fname, savename, fc, delay_n_period=10):
+        """
+        Read freq domain impluse response binary file;
+        output hdf5 of freq and time domain data
+        :param fname: string, freq domain impluse response binary file
+        :param savename: string, hdf5 filename without extension
+        :param fc: float, central freq
+        :param delay_n_period: float,
+        :return: hdf5 file with keys
+            seismo: time domain data, source wavelet = ricker(fc, delay_n_period)
+            seismo_spec: freq domain data, source wavelet = ricker(fc, delay_n_period)
+            spectrum: freq domain impluse response
+            delay:
+            fc:
+            df:
+            dt:
+            freqlist:
+        """
         dataf = self.read_seis(fname)
         _, nsrc, nrec = dataf.shape
         fmax = self.freqlist.max()
@@ -130,6 +147,16 @@ class PltToy2dac:
             f.create_dataset('dt', data=1./dfreq/(N-1))
 
     def plot_seismo(self, fname, fh5, zsrc_plot, zrec_plot, fc=100, delay_n_period=10):
+        """
+        Plot one trace of time domain data
+        :param fname:
+        :param fh5:
+        :param zsrc_plot: float, src depth
+        :param zrec_plot: float, rec depth
+        :param fc: float, central freq
+        :param delay_n_period: float, num of delayed periods
+        :return:
+        """
         if not os.path.exists(os.path.join(self.datadir, fh5 + '.h5')):
             self.freq2time(fname, fh5, fc, delay_n_period)
         with h5py.File(os.path.join(self.datadir, fh5 + '.h5'), 'r') as f:
@@ -156,6 +183,21 @@ class PltToy2dac:
 
     def plot_gather(self, fname, fh5, zsrc_plot, zrec_plot=(0, 106), t_plot=(0, 1000),
                     fc=100, delay_n_period=10, aspect=1.0, figsize=(6, 6), clip=1., interp_scalar=1):
+        """
+        Plot a shot gather a gray scale image
+        :param fname:
+        :param fh5:
+        :param zsrc_plot:
+        :param zrec_plot:
+        :param t_plot:
+        :param fc:
+        :param delay_n_period:
+        :param aspect:
+        :param figsize:
+        :param clip:
+        :param interp_scalar:
+        :return:
+        """
         if not os.path.exists(os.path.join(self.datadir, fh5 + '.h5')):
             self.freq2time(fname, fh5, fc, delay_n_period)
         with h5py.File(os.path.join(self.datadir, fh5 + '.h5'), 'r') as f:
@@ -191,6 +233,13 @@ class PltToy2dac:
         return fig, ax
 
     def interp_seis(self, t, data, scalar=5.):
+        """
+        Interpolate data for display
+        :param t:
+        :param data:
+        :param scalar:
+        :return:
+        """
         dt0 = t[1] - t[0]
         dt = dt0 / scalar
         tplot = np.arange(t[0], t[-1] + 0.5 * dt, dt)
@@ -202,6 +251,19 @@ class PltToy2dac:
 
     def plot_wiggle(self, fname, fh5, zsrc_plot, zrec_plot=(0, 106), t_plot=(0, 1000),
                     fc=100, delay_n_period=10, figsize=(6, 6), clip=0.9):
+        """
+        Plot seismogram as wiggles
+        :param fname: string, binary file of freq domain data
+        :param fh5: string, hdf5 file of time domain data
+        :param zsrc_plot:
+        :param zrec_plot:
+        :param t_plot:
+        :param fc:
+        :param delay_n_period:
+        :param figsize:
+        :param clip:
+        :return:
+        """
         if not os.path.exists(os.path.join(self.datadir, fh5 + '.h5')):
             self.freq2time(fname, fh5, fc, delay_n_period)
         with h5py.File(os.path.join(self.datadir, fh5 + '.h5'), 'r') as f:
