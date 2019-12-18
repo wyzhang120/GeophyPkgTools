@@ -155,7 +155,7 @@ class PltToy2dac:
         plt.show()
 
     def plot_gather(self, fname, fh5, zsrc_plot, zrec_plot=(0, 106), t_plot=(0, 1000),
-                    fc=100, delay_n_period=10, aspect=1.0):
+                    fc=100, delay_n_period=10, aspect=1.0, figsize=(6, 6), clip=1., interp_scalar=1):
         if not os.path.exists(os.path.join(self.datadir, fh5 + '.h5')):
             self.freq2time(fname, fh5, fc, delay_n_period)
         with h5py.File(os.path.join(self.datadir, fh5 + '.h5'), 'r') as f:
@@ -170,17 +170,67 @@ class PltToy2dac:
         idt0 = np.argmin(np.abs(t_plot[0] - t))
         idt1 = np.argmin(np.abs(t_plot[1] - t))
         data = seis[idt0:idt1 + 1, idSrc, idRec0:idRec1 + 1]
+        if interp_scalar > 1:
+            data = self.interp_seis(t[idt0:idt1+1], data, interp_scalar)
+        amp_max = np.max(np.abs(data))
+        vmin = -clip * amp_max
+        vmax = clip * amp_max
+        data_plot = np.clip(data, vmin, vmax)
         ext = [self.zrec[idRec0], self.zrec[idRec1], t[idt1], t[idt0]]
-        fig, ax = plt.subplots()
-        img = ax.imshow(data, extent=ext, cmap='Greys', aspect=aspect)
+        fig, ax = plt.subplots(figsize=figsize)
+        img = ax.imshow(data, extent=ext, cmap='Greys', aspect=aspect, vmin=vmin, vmax=vmax)
         # polarity: black is positive
         # ax.imshow(data, cmap='Greys')
-        ax.set_ylabel('t [ms]')
-        ax.set_xlabel('zrec [m]')
+        ax.set_ylabel('t (ms)')
+        ax.set_xlabel('zrec (m)')
         # divider = make_axes_locatable(ax)
         # cax = divider.append_axes('right', size='5%', pad=0.05)
         # cbar = fig.colorbar(img, cax=cax, spacing='uniform')
         plt.tight_layout()
+        plt.show()
+        return fig, ax
+
+    def interp_seis(self, t, data, scalar=5.):
+        dt0 = t[1] - t[0]
+        dt = dt0 / scalar
+        tplot = np.arange(t[0], t[-1] + 0.5 * dt, dt)
+        ntrace = data.shape[1]
+        data_out = np.zeros([len(tplot), ntrace])
+        for i in range(ntrace):
+            data_out[:, i] = np.interp(tplot, t, data[:, i])
+        return data_out
+
+    def plot_wiggle(self, fname, fh5, zsrc_plot, zrec_plot=(0, 106), t_plot=(0, 1000),
+                    fc=100, delay_n_period=10, figsize=(6, 6), clip=0.9):
+        if not os.path.exists(os.path.join(self.datadir, fh5 + '.h5')):
+            self.freq2time(fname, fh5, fc, delay_n_period)
+        with h5py.File(os.path.join(self.datadir, fh5 + '.h5'), 'r') as f:
+            seis = f['seismo'][()]
+            dt = f['dt'][()]
+            delay = f['delay'][()]
+        nt = seis.shape[0]
+        t = (dt * np.arange(nt) - delay) * 1000
+        idSrc = np.argmin(np.abs(zsrc_plot - self.zsrc))
+        idRec0 = np.argmin(np.abs(zrec_plot[0] - self.zrec))
+        idRec1 = np.argmin(np.abs(zrec_plot[1] - self.zrec))
+        idt0 = np.argmin(np.abs(t_plot[0] - t))
+        idt1 = np.argmin(np.abs(t_plot[1] - t))
+        data = seis[idt0:idt1 + 1, idSrc, idRec0:idRec1 + 1]
+        fig, ax = plt.subplots(figsize=figsize)
+        ntrace = idRec1 - idRec0 + 1
+        offsets = np.arange(1, 1 + ntrace, 1)
+        taxis = t[idt0:idt1+1]
+        amp_max = np.max(data)
+        scalar = 1 / amp_max
+        data_plot = data * scalar
+        for i in range(ntrace):
+            offset = offsets[i]
+            x = offset + data_plot[:, i]
+            ax.plot(x, taxis, 'k-')
+            ax.fill_betweenx(taxis, offset, x, where=(x > offset), color='k')
+        ax.set_ylabel('t [ms]')
+        ax.set_xlabel('trace NO.')
+        ax.set_ylim(ax.get_ylim()[::-1])
         plt.show()
         return fig, ax
 
@@ -202,8 +252,7 @@ class PltToy2dac:
         idRec = self.get_id(zrec_plot, self.zrec)
         data_amp = amp[:, idSrc, idRec]
         data_phase = phase[:, idSrc, idRec]
-        freq = self.freqlist
-        return data_amp, data_phase, freq
+        return data_amp, data_phase
 
 
 def greenfunc2d(xzsrc, xzrec, freqlist, vp, qp=1000):
