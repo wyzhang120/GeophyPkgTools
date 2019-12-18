@@ -2,7 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from PkgTools.Denise.utils_denise import ModLoader, PltModel
+from Denise.utils_denise import ModLoader, PltModel
 from scipy.ndimage.filters import laplace
 
 # datadir = '/project/stewart/wzhang/src/DENISE-Black-Edition/par_fdtest/model'
