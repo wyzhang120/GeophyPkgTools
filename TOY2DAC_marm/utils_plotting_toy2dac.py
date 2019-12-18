@@ -75,6 +75,15 @@ class PltToy2dac:
         return seis
 
     def plot_spec(self, fname, zsrc_plot, zrec_plot, vp=3000, qp=1000):
+        """
+        Plot modeled freq domain impulse response and theoretic green's function
+        :param fname:
+        :param zsrc_plot:
+        :param zrec_plot:
+        :param vp:
+        :param qp:
+        :return:
+        """
         seis = self.read_seis(fname)
         idSrc = np.argmin(np.abs(zsrc_plot - self.zsrc))
         idRec = np.argmin(np.abs(zrec_plot - self.zrec))
@@ -127,7 +136,7 @@ class PltToy2dac:
         ind2 = Nhalf + 1
         datafft = np.zeros((N, nsrc, nrec), dtype=np.complex64)
         datafft[ind1:ind2, :, :] = dataf
-        datafft[ind2:-ind1 + 1, :, :] = np.conj(dataf[::-1, :, :])
+        datafft[ind2:N-ind1 + 1, :, :] = np.conj(dataf[::-1, :, :])
         rconst = np.sqrt(np.pi)
         delay = delay_n_period / fc
         ricker_delay = 2. / rconst * f ** 2 / fc ** 3 * np.exp(
