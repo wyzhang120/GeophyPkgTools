@@ -45,7 +45,7 @@ def plot_fwi_true_init():
                        mod_true.vp/1000, mod_true.vs/1000, mod_true.rho/1000,
                        mod_init.vp/1000, mod_init.vs/1000, mod_init.rho/1000,),
                       titles, ['km/s', 'km/s', 'g/cc'] * 3, 0,
-                      mod_inv.height, mod_inv.width, padDist=(0, 0, -4050, 0), ytitle='Depth')
+                      mod_inv.height, mod_inv.width, padDist=(0, 0, -3958.75, 0), ytitle='Depth')
     fig = PltImg.viewMulti(np.arange(3, dtype=np.int32), (3, 1), (6, 1.5), cmap=cmap)
     fig.savefig(os.path.join(datadir, 'Marm_Denise_FWI.pdf'))
     fig = PltImg.viewMulti(np.arange(3, 6, dtype=np.int32), (3, 1), (6, 1.5), cmap=cmap)
