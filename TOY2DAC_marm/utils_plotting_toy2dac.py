@@ -331,7 +331,7 @@ def greenfunc2d(xzsrc, xzrec, freqlist, vp, qp=1000):
     xzrec = np.array(xzrec)
     freq = np.array(freqlist)
     r = np.sqrt(np.sum((xzsrc - xzrec)**2))
-    vp = vp * (1 - 1j/(2 * qp))
+    # vp = vp * (1  + 1j/(2 * qp))
     k = 2 * np.pi * freq / vp
     g = hankel1(0, k * r) * 1j/4
     return g
