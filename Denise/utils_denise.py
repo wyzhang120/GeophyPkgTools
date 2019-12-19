@@ -118,6 +118,13 @@ class ModLoader:
             cmap = pickle.load(f)
         return cmap
 
+    def resize(self, dx, attr):
+        s = self.dx / dx
+        arr = self.__getattribute__(attr)
+        size = np.int32((np.array(arr.shape) - 1) * s + 1)
+        arr_out = resize(arr, size, preserve_range=True, mode='constant')
+        return arr_out
+
 
 def workflow_parser(indir, in_name, outdir, out_name):
     df = pd.read_csv(os.path.join(indir, in_name), sep='\s+', header=0)
@@ -312,7 +319,7 @@ class LocateDeniseMod:
                             par0['dx'], fastz=par0['fastz'])
         vp1 = loader1.readmod('vp', trans=par0['trans'])
         scaler = par0['dx'] / par1['dx']
-        size2 = np.int32(np.array(vp1.shape) * scaler)
+        size2 = np.int32((np.array(vp1.shape) - 1) * scaler + 1)
         vp2 = resize(vp1, size2, preserve_range=True, mode='constant')
         return vp2
 
