@@ -126,6 +126,12 @@ class ModLoader:
         return arr_out
 
 
+def resize_mod(modx, dxOut, dx0):
+    s = dx0 / dxOut
+    size = np.int32((np.array(modx.shape) - 1) * s + 1)
+    arr_out = resize(modx, size, preserve_range=True, mode='constant')
+    return arr_out
+
 def workflow_parser(indir, in_name, outdir, out_name):
     df = pd.read_csv(os.path.join(indir, in_name), sep='\s+', header=0)
     df.to_csv(os.path.join(outdir, out_name))
