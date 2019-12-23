@@ -335,3 +335,75 @@ def greenfunc2d(xzsrc, xzrec, freqlist, vp, qp=1000):
     k = 2 * np.pi * freq / vp
     g = hankel1(0, k * r) * 1j/4
     return g
+
+
+class InvGroupLoader:
+    def __init__(self, datadir, basename, freqlist,  nx=301, nz=106, fastz=True):
+        self.datadir = datadir
+        self.freqlist = freqlist
+        self.basename = basename
+        self.nx = nx
+        self.nz = nz
+        self.ngroup = len(freqlist)
+        self.fastz = fastz
+
+    def read_inv_group(self, imod):
+        if self.fastz:
+            n0, n1 = [self.nx, self.nz]
+        else:
+            n0, n1 = [self.nz, self.nx]
+        inv_mod = np.zeros([self.ngroup, n0, n1], dtype=np.float32)
+        for i, ifreq in enumerate(self.freqlist):
+            fname = self.basename.format(imod, ifreq[0], ifreq[1], ifreq[2])
+            invname = os.path.join(self.datadir, fname)
+            inv_mod[i] = np.fromfile(invname, dtype=np.float32).reshape((n0, n1))
+        return inv_mod
+
+    def show_fig(self, imod, vmin=None, vmax=None, trans=True):
+        imgs = self.read_inv_group(imod)
+        vmin = np.min(imgs) if vmin is None else vmin
+        vmax = np.max(imgs) if vmax is None else vmax
+        nfreq = imgs.shape[0]
+        fig, ax = plt.subplots(1, nfreq)
+        for i, iax in enumerate(ax):
+            img = imgs[i].T if trans else imgs[i]
+            iax.imshow(img, cmap='jet_r', vmin=vmin, vmax=vmax)
+        plt.show()
+
+
+class CompFigs:
+    def __init__(self, grp1, grp2):
+        """
+
+        :param grp1: ndarry, 2d or 3d, ref fig
+        :param grp2: ndarry, 3d
+        """
+        self.grp1 = grp1
+        self.grp2 = grp2
+
+    def get_percent_diff(self):
+        nfreq = self.grp2.shape[0]
+        if len(self.grp1.shape) == 2:
+            n0, n1 = self.grp1.shape
+            grp1 = self.grp1.reshape(1, n0, n1)
+            grp1 = np.tile(grp1, (nfreq, 1, 1))
+        else:
+            grp1 = self.grp1
+        diff = (self.grp2 - grp1) / grp1 * 100
+        return diff
+
+    def show_diff(self, figsize, trans=True, clip=1., sym='True'):
+        diff = self.get_percent_diff()
+        fig, ax = plt.subplots(1, diff.shape[0],figsize=figsize)
+        for i, img in enumerate(diff):
+            img = img.T if trans else img
+            if sym:
+                vmax = clip * np.max(np.abs(img))
+                im = ax[i].imshow(img, cmap='seismic', vmin=-vmax, vmax=vmax)
+            else:
+                im = ax[i].imshow(img, cmap='seismic')
+            divider = make_axes_locatable(ax[i])
+            cax = divider.append_axes('right', size='5%', pad=0.05)
+            cbar = fig.colorbar(im, cax=cax, spacing='uniform')
+            cbar.set_label('%')
+        plt.show()
