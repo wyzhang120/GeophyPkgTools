@@ -6,6 +6,8 @@ import time
 import multiprocessing
 from shutil import copyfile
 from skimage.filters import gaussian
+import cv2 as cv
+import matplotlib.pyplot as plt
 
 
 def acq(pars, parr, dzsrc=None, dzrcv=None):
@@ -239,7 +241,6 @@ def fwi_in(par, fdata):
         f.write('%(ndataw)d %(ddataw)g    !number of sample and space step of the weighting file\n'%par)
 
 
-
 def runt2d(shcmd, conn):
     tag=1
     pfwi = Popen(shcmd, close_fds=True)
@@ -323,6 +324,61 @@ def fwi1mod(par, imod, irec, freqlist, shcmd, freqmng='freq_management',
         fwi1rec(par, imod, fdata, 'l', shcmd, flim, fsize)
 
 
+def fwi1modx(par, imod, freqlist, shcmd):
+    """
+
+    :param par:
+    :param imod:
+    :param fdata:
+    :param irec: label of rec array, 'r' or 'l'
+    :param shcmd:
+    :param flim: [freq_min, freq_max, dfreq]
+    :return:
+    """
+    # select data
+    fname = os.path.join(par['path_data'], par['data_pre'] + str(imod))
+    fshape = [par['nfreq'], par['nshots'], par['nrec']]
+    data = np.fromfile(fname, dtype=np.complex64)
+    data = np.reshape(data, fshape)
+    fidx = ((freqlist - par['freq0']) / par['freq_step']).astype(np.int32)
+    dataw1 = data[fidx, :, :]
+    fout = par['data_inv']
+    dataw1.tofile(fout)
+    nfreq = len(freqlist)
+    with open(par['ffreq_man'], 'w') as f:
+        f.write('%d\n' % nfreq)
+        freqlist.tofile(f, sep=' ', format='%g')
+        f.write('\n')
+    if os.path.isfile('param_vp_final'):
+        os.remove('param_vp_final')
+    t1 = datetime.now()
+    conn_run, conn_check = multiprocessing.Pipe()
+    p1 = multiprocessing.Process(target=runt2d, args=(shcmd,conn_run))
+    p2 = multiprocessing.Process(target=checkt2d, args=(par['inv_fsize'], conn_check))
+    p2.start()
+    p1.start()
+    p2.join()
+    p1.join()
+    t2 = datetime.now()
+    dt0 = t2 - t1
+    dt = dt0.seconds + dt0.microseconds / 1e6
+    print('mod {:d}, running time:{:.3f}'.format(imod, dt))
+    # rename file and clean up
+    savelist = ['param_vp_final', 'gradient']
+    renamel = ['inv_vp', 'inv_grad']
+    fmin = freqlist[0]
+    fmax = freqlist[-1]
+    dfinv = (fmax - fmin) / (len(freqlist)-1.)
+    for j in range(len(savelist)):
+        fwi_out = os.path.join(par['inv_path'], savelist[j])
+        if os.path.isfile(fwi_out):
+            os.rename(fwi_out,'{:s}{:d}_{:g}_{:g}_{:g}Hz'.format(
+                renamel[j], imod, fmin, fmax, dfinv))
+    tempd = os.path.join(par['inv_path'], fout)
+    if os.path.isfile(tempd):
+        os.remove(tempd)
+
+
 def checkt2dfd(fsize, conn):
     while True:
         if os.path.isfile('data_modeling'):
@@ -359,3 +415,46 @@ def t2dfd(par, imod, shcmd):
     if os.path.isfile('data_modeling'):
         os.rename('data_modeling', par['data_pre']+str(imod))
     os.remove(tgtfvp)
+
+
+class InitMod:
+    def __init__(self, datadir, basename, shape, dtype=np.float32):
+        self.datadir = datadir
+        self.basename = basename
+        self.shape = shape
+        self.dtype = dtype
+
+    def loadata(self, imod):
+        fname = self.basename.format(imod)
+        with open(os.path.join(self.datadir, fname), 'rb') as f:
+            data = np.fromfile(f, dtype=self.dtype).reshape(self.shape)
+        return data
+
+    def smooth(self, imod, ksize, rep, sigma=None, show_fig=False):
+        """
+        Smooth an image using RectBlur or GaussBlur
+        :param imod: int, mod id
+        :param ksize: tuple, int, kernel size
+        :param rep: int, repeatition
+        :param sigma: float
+        :return:
+        """
+        img0 = self.loadata(imod)
+        ksize = tuple(ksize)
+        for i in range(rep):
+            if sigma is None:
+                img = cv.blur(img0, ksize)
+            else:
+                img = cv.GaussianBlur(img0, ksize, sigma, sigma)
+        img = img.astype(self.dtype)
+        if show_fig:
+            self.show_fig(img0.T, img.T)
+        return img
+
+    def show_fig(self, modtrue, modsmooth):
+        vmin = modtrue.min()
+        vmax = modtrue.max()
+        fig, ax = plt.subplots(1 ,2)
+        ax[0].imshow(modtrue, cmap='jet', vmin=vmin, vmax=vmax)
+        ax[1].imshow(modsmooth, cmap='jet', vmin=vmin, vmax=vmax)
+        plt.show()
