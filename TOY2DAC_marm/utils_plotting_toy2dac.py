@@ -207,8 +207,8 @@ class PltToy2dac:
         :param interp_scalar:
         :return:
         """
-        if not os.path.exists(os.path.join(self.datadir, fh5 + '.h5')):
-            self.freq2time(fname, fh5, fc, delay_n_period)
+        # if not os.path.exists(os.path.join(self.datadir, fh5 + '.h5')):
+        self.freq2time(fname, fh5, fc, delay_n_period)
         with h5py.File(os.path.join(self.datadir, fh5 + '.h5'), 'r') as f:
             seis = f['seismo'][()]
             dt = f['dt'][()]
@@ -394,16 +394,133 @@ class CompFigs:
 
     def show_diff(self, figsize, trans=True, clip=1., sym='True'):
         diff = self.get_percent_diff()
-        fig, ax = plt.subplots(1, diff.shape[0],figsize=figsize)
+        fig, ax = plt.subplots(2, diff.shape[0],figsize=figsize)
+        labels = ['m/s', '%']
         for i, img in enumerate(diff):
             img = img.T if trans else img
+            img0 = self.grp2[i].T if trans else self.grp2[i]
+            im0 = ax[0, i].imshow(img0, cmap='jet_r')
             if sym:
                 vmax = clip * np.max(np.abs(img))
-                im = ax[i].imshow(img, cmap='seismic', vmin=-vmax, vmax=vmax)
+                im = ax[1, i].imshow(img, cmap='seismic', vmin=-vmax, vmax=vmax)
             else:
-                im = ax[i].imshow(img, cmap='seismic')
-            divider = make_axes_locatable(ax[i])
-            cax = divider.append_axes('right', size='5%', pad=0.05)
-            cbar = fig.colorbar(im, cax=cax, spacing='uniform')
-            cbar.set_label('%')
+                im = ax[1, i].imshow(img, cmap='seismic')
+            for irow, imx in enumerate([im0, im]):
+                divider = make_axes_locatable(ax[irow, i])
+                cax = divider.append_axes('right', size='5%', pad=0.05)
+                cbar = fig.colorbar(imx, cax=cax, spacing='uniform')
+                cbar.set_label(labels[irow])
+        fig.tight_layout()
         plt.show()
+
+
+class FreqData:
+    '''
+    plot amplitude and phase of output data from TOY2DAC
+    python modules needed:
+      import numpy as np
+      import matplotlib.pyplot as plt
+    rec = [nrec, rec0, drec] drec in meters
+    src = [nsrc, src0, dsrc]
+    freq= [nfreq, freq0, dfreq]
+    shot_p in depth
+    rec_p = [starting index, max rec index, stride]
+    orec_p in depth
+    '''
+
+    def __init__(self, datadir, fname, rec=(210, 1, 1), src=(105, 0, 1), freq=(299, 2, 1)):
+        self.datadir = datadir
+        self.fname = fname
+        self.rec = rec
+        self.src = src
+        self.freq = freq
+        fin = os.path.join(datadir, fname)
+        self.data_in = np.fromfile(fin, dtype=np.complex64).reshape((freq[0], src[0], rec[0]))
+        self.amp = np.absolute(self.data_in)
+        self.ph = np.angle(self.data_in, deg=False)
+
+    def add_noise(self, nsr=0.05, seed=42):
+        """
+        Add noise to data
+        :param nsr: float, amp noise / signal
+        :return:
+        """
+        noise_amp = nsr * np.mean(self.amp)
+        data_shape = np.array(self.ph.shape)
+        ndata = int(np.prod(data_shape))
+        np.random.seed(seed)
+        noise_ph = np.reshape(2* np.pi * np.random.rand(ndata), data_shape)
+        noise_real = noise_amp * np.cos(noise_ph)
+        noise_img = noise_amp * np.sin(noise_ph)
+        noise = noise_real + 1j * noise_img
+        return noise + self.data_in
+
+    def show(self, shot_p, rec_p=(0, 105, 5), orec_p=1., f1_p=2, f2_p=300,
+             figsize=(12, 6), grey=False, amp=None, ph=None):
+        # unwrap input params
+        """
+        Plot selected shot
+        :param shot_p: float, shot depth to be plotted
+        :param rec_p: int, tuple, (min, max, step) of rec index
+        :param orec_p: float, origin of rec depth
+        :param f1_p: float, min freq
+        :param f2_p: float, max freq
+        :param figsize: tuple
+        :param grey: bool, grayscale to color rec depth
+        :param amp: 3d float array, amplitude
+        :param ph: 3d float array, phase
+        :return:
+        """
+        f0 = self.freq[1]
+        df = self.freq[2]
+        dr = self.rec[2]
+        s0 = self.src[1]
+        ds = self.src[2]
+        pshot = int((shot_p - s0) / ds)
+        prec0 = rec_p[0]
+        prec1 = rec_p[1]
+        stride = rec_p[2]
+        r_idx = np.arange(0, prec1 - prec0, stride)
+        pnrec = len(r_idx)
+        freq_p = np.arange(f1_p, f2_p + df, df)
+        f_idx = ((freq_p - f0) / df).astype(int)
+        # color gradient
+        blue = np.linspace(0.1, 0.9, stride * pnrec)
+        if amp is None:
+            amp = self.amp
+        if ph is None:
+            ph = self.ph
+        ph = np.degrees(ph)
+        fig, axes = plt.subplots(1, 2)
+        fig.set_size_inches(figsize[0], figsize[1])
+        for i in r_idx:
+            if grey == False:
+                axes[0].plot(freq_p, 20 * np.log10(amp[f_idx, pshot, i + prec0]), color=(blue[-i - 1], 0, blue[i]))
+                axes[1].plot(freq_p, ph[f_idx, pshot, i + prec0], color=(blue[-i - 1], 0, blue[i]))
+
+            if grey == True:
+                axes[0].plot(freq_p, 20 * np.log10(amp[f_idx, pshot, i + prec0]), color=str(blue[i]))
+                axes[1].plot(freq_p, ph[f_idx, pshot, i + prec0], color=str(blue[i]))
+
+            fig.legend(np.arange(orec_p, orec_p + pnrec * dr * stride, stride * dr),
+                       loc='right', title='zsrc [m]')
+            axes[0].set_xlabel(r'$f (Hz)$')
+            axes[1].set_xlabel(r'$f (Hz)$')
+            axes[0].set_ylabel(r'$amp (dB)$')
+            axes[1].set_ylabel(r'$phase(^\o)$')
+            axes[1].yaxis.set_label_coords(-0.1, 0.5)
+        plt.show()
+
+    def show_noisy_data(self, shot_p, nsr=0.05):
+        data = self.add_noise(nsr)
+        amp = np.absolute(data)
+        ph = np.angle(data, deg=False)
+        self.show(shot_p, amp=amp, ph=ph)
+
+    def save_noise_data(self, savedir, nsr=0.05, seed=42):
+        if not os.path.isdir(savedir):
+            os.mkdir(savedir)
+        data = np.complex64(self.add_noise(nsr, seed))
+        fname = '{:s}_nsr{:.2f}'.format(self.fname, nsr)
+        with open(os.path.join(savedir, fname), 'wb') as f:
+            data.tofile(f)

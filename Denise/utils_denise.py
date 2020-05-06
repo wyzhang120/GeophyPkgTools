@@ -342,3 +342,117 @@ class LocateDeniseMod:
         ind_align = self.locate_template(vp_segy, self.resize_denise)
         offset = np.array(ind_align) * self.par['dx'] + np.array([xsearch[0], zsearch[0]])
         return ind_align, offset
+
+
+class PltSeisDenise:
+    """
+    Plot seismic gather in binary format output from Denise
+    """
+    def __init__(self, par):
+        self.datadir = par['datadir']
+        self.basename = par['basename']
+        self.nt = par['nt']
+        self.ntrace = par['zrec'].shape[0]
+        self.dt = par['dt'] # ms
+        self.fc = par['fc']
+        self.delay_n_period = par['delay_n_period']
+        self.zrec = par['zrec']
+        self.zsrc = par['zsrc']
+
+    def read_gather(self, imod, zshot):
+        ishot = int((zshot - self.zsrc[0]) / (self.zsrc[1] - self.zsrc[0]))
+        fname = os.path.join(self.datadir, self.basename.format(imod, ishot))
+        seis = np.fromfile(fname, dtype=np.float32).reshape((self.ntrace, self.nt))
+        return seis
+
+    def plot_gather(self, imod, zshot, tlim, nsr=0,
+                    basename='marm{:d}_shot{:d}m_nsr{:d}.pdf', aspect=1.0, seis=None):
+        ishot = int((zshot - self.zsrc[0]) / (self.zsrc[1] - self.zsrc[0]))
+        if seis is None:
+            seis = self.read_gather(imod, ishot)
+        tlim = np.array(tlim)
+        t0 = -self.delay_n_period / self.fc
+        tlim = np.clip(tlim, 0, t0 + self.nt * self.dt)
+        idt = np.int32(tlim / self.dt)
+        tplot = self.dt * idt
+        data = seis[:, idt[0] : idt[1] + 1]
+        ext = (self.zrec[0], self.zrec[-1], tplot[1], tplot[0])
+        fig, ax = plt.subplots()
+        im = ax.imshow(data.T, cmap='Greys', extent=ext, aspect=aspect)
+        # plt.colorbar(im)
+        ax.set_ylabel('t (ms)')
+        ax.set_xlabel('zrec (m)')
+        plt.tight_layout()
+        fname = basename.format(imod, int(self.zsrc[ishot]), nsr)
+        fig.savefig(os.path.join(self.datadir, fname))
+        plt.show()
+        plt.close(fig)
+
+    def add_noise(self, imod, zshot, nsrlist=(0, 1., 3.), tlim=(50, 200),
+                  ztrace=200, rseed=39, colors=('r', 'k', 'b'),
+                  basename='marm{:d}_shot{:d}m_tr{:d}_spec.pdf'):
+        seist = self.read_gather(imod, zshot)
+        ishot = int((zshot - self.zsrc[0]) / (self.zsrc[1] - self.zsrc[0]))
+        seisf = np.fft.fft(seist, axis=1) / self.nt
+        amp = np.abs(seisf)
+        dt = self.dt/1000
+        df = 1./ dt / self.nt
+        f = df * np.arange(0, self.nt)
+        fc = self.fc
+        idf1 = np.nonzero(f > 300)[0][0]
+        rickerf0 = 2 * f**2 / (np.sqrt(np.pi) * fc**3) * np.exp(-(f/fc)**2)
+        rickerf = np.copy(rickerf0)
+        rickerf[0] = rickerf[1]
+        rickerf = rickerf.reshape([1, -1])
+        rickerf = np.tile(rickerf, (self.ntrace, 1))
+        imp_amp = np.zeros(amp.shape)
+        imp_amp[:, :idf1] = amp[:, :idf1]/rickerf[:, :idf1]
+        seis_amp = [amp]
+        self.plot_gather(imod, zshot, tlim, 0, aspect=1.0, seis=seist)
+        np.random.seed(rseed)
+        delay = self.delay_n_period / dt
+        data_shape = amp.shape
+        ndata = int(np.prod(data_shape))
+        for nsr in nsrlist[1:]:
+            noise_amp = nsr * np.mean(imp_amp[:, 1:idf1])
+            noise_phs = np.reshape(2 * np.pi * np.random.rand(ndata), data_shape)
+            noise_real = noise_amp * np.cos(noise_phs)
+            noise_img = noise_amp * np.sin(noise_phs)
+            # noise = (noise_real + 1j * noise_img)
+            noise = (noise_real + 1j * noise_img) * rickerf0 * np.exp(-1j * f * delay)
+            seisf_noisy = noise + seisf
+            seist_noisy = np.real(np.fft.ifft(seisf_noisy, axis=1) * self.nt)
+            self.plot_gather(imod, zshot, tlim, int(nsr), aspect=1.0, seis=seist_noisy)
+            seisf_amp = np.abs(seisf_noisy)
+            seis_amp.append(seisf_amp)
+        itrace = int((ztrace - self.zrec[0]) / (self.zrec[1] - self.zrec[0]))
+        ztrace = self.zrec[itrace]
+        fig, ax = plt.subplots()
+        for i, ampx in enumerate(seis_amp):
+            ax.plot(f[1:idf1], ampx[itrace, 1:idf1], colors[i],
+                    label='nsr = {:d}'.format(int(nsrlist[i])))
+            ax.legend()
+            ax.set_xlabel('f (Hz)')
+            ax.set_ylabel('Amp')
+            ax.set_xlim(0, 300)
+            ax.set_xlim(0, 300)
+        plt.tight_layout()
+        fname = basename.format(imod, int(self.zsrc[ishot]), int(ztrace))
+        fig.savefig(os.path.join(self.datadir, fname))
+        plt.show()
+        plt.close(fig)
+        fig, ax = plt.subplots()
+        for i, ampx in enumerate(seis_amp):
+            ax.plot(f[1:idf1], np.mean(ampx[:, 1:idf1], axis=0), colors[i],
+                    label='nsr = {:d}'.format(int(nsrlist[i])))
+            ax.legend()
+            ax.set_xlabel('f (Hz)')
+            ax.set_ylabel('Amp')
+            ax.set_xlim(0, 300)
+            ax.set_xlim(0, 300)
+        plt.tight_layout()
+        fname = 'marm{:d}_shot{:d}m_mean_spec.pdf'.format(imod, int(self.zsrc[ishot]))
+        fig.savefig(os.path.join(self.datadir, fname))
+        plt.show()
+
+
